@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Supply Chain System</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+/* 🌈 Background */
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    color: white;
+    background: linear-gradient(135deg, #0f172a, #1e3a8a);
+}
+
+/* Container */
+.container {
+    text-align: center;
+    padding: 20px;
+}
+
+/* Glass Card */
+.glass {
+    margin: 20px auto;
+    padding: 20px;
+    width: 90%;
+    max-width: 900px;
+    border-radius: 15px;
+    background: rgba(255,255,255,0.05);
+    transition: all 0.3s ease;
+}
+
+/* 🔥 POP EFFECT ON HOVER */
+.glass:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(99,102,241,0.5);
+}
+
+/* ROUTES */
+.route-card {
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+/* 🔥 POP EFFECT */
+.route-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(255,255,255,0.4);
+}
+
+/* Click effect */
+.route-card:active {
+    transform: scale(0.97);
+}
+
+/* COLORS */
+.best { background: #22c55e; }
+.alt1 { background: #3b82f6; }
+.alt2 { background: #facc15; }
+.alt3 { background: #a855f7; }
+.alt4 { background: #ec4899; }
+
+/* INPUT */
+input {
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    margin: 5px;
+    transition: all 0.3s ease;
+}
+
+/* 🔥 INPUT POP */
+input:focus {
+    transform: scale(1.05);
+    outline: none;
+    box-shadow: 0 0 10px #6366f1;
+}
+
+/* BUTTON */
+button {
+    margin-top: 10px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+/* 🔥 BUTTON HOVER */
+button:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 15px rgba(139,92,246,0.7);
+}
+
+/* CLICK EFFECT */
+button:active {
+    transform: scale(0.95);
+}
+
+/* Safety colors */
+.safe { color: #22c55e; }
+.moderate { color: #facc15; }
+.unsafe { color: #ef4444; }
+
+/* Chart */
+.chart-container {
+    width: 300px;
+    margin: auto;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🚚 AI Supply Chain Intelligence</h1>
+
+<div class="glass">
+    <h2>📍 Route Planner</h2>
+
+    <input id="source" placeholder="Source">
+    <input id="destination" placeholder="Destination">
+
+    <br><br>
+
+    <button onclick="fetchData()">Analyze Route</button>
+
+    <div id="routesContainer"></div>
+</div>
+
+<div class="glass">
+    <h2>🌦 Weather & Safety</h2>
+
+    <p>🌡 Temperature: <span id="temp">--</span></p>
+    <p>🌧 Condition: <span id="rain">--</span></p>
+    <p>🧠 Safety: <span id="safety">--</span></p>
+</div>
+
+<div id="decision" class="glass"></div>
+
+<div class="glass">
+    <h2>📊 Risk Distribution</h2>
+    <div class="chart-container">
+        <canvas id="chart"></canvas>
+    </div>
+</div>
+
+<div class="glass">
+    <h2>🌍 Route Map</h2>
+    <iframe id="mapFrame" width="100%" height="300"></iframe>
+</div>
+
+</div>
+
+<script>
+let myChart;
+
+// WEATHER
+async function getWeather(city) {
+    const API_KEY = "709b675c99ff492ca11cb5d1c5029b7a";
+
+    try {
+        let res = await fetch(
+            `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
+        );
+
+        let data = await res.json();
+
+        if (!data || data.cod !== 200) {
+            res = await fetch(
+                `https://api.openweathermap.org/data/2.5/weather?q=Hyderabad&appid=${API_KEY}&units=metric`
+            );
+            data = await res.json();
+        }
+
+        return {
+            temp: data.main.temp,
+            condition: data.weather[0].main
+        };
+
+    } catch {
+        return { temp: 25, condition: "Default" };
+    }
+}
+
+// SAFETY
+function calculateSafety(temp, condition, trafficRisk) {
+
+    let score = 100;
+
+    if (temp > 40) score -= 40;
+    else if (temp < 5) score -= 20;
+
+    if (condition.toLowerCase().includes("rain")) score -= 30;
+
+    if (trafficRisk === "HIGH") score -= 20;
+
+    if (score >= 70) return { text: "✅ Safe", class: "safe" };
+    if (score >= 40) return { text: "⚠️ Moderate", class: "moderate" };
+    return { text: "❌ Unsafe", class: "unsafe" };
+}
+
+// MAIN
+async function fetchData() {
+
+    const source = document.getElementById("source").value.trim() || "Hyderabad";
+    const destination = document.getElementById("destination").value.trim() || "Chennai";
+
+    const res = await fetch(
+        `http://localhost:5000/api/optimize?source=${source}&destination=${destination}`
+    );
+
+    const data = await res.json();
+
+    const weather = await getWeather(source);
+
+    const safety = calculateSafety(
+        weather.temp,
+        weather.condition,
+        data.traffic.risk
+    );
+
+    const routes = [
+        data.decision.recommendedRoute,
+        `${source} → Alternative Highway`,
+        `${source} → Scenic Route`,
+        `${source} → Coastal Route`,
+        `${source} → Expressway Route`
+    ];
+
+    const classes = ["best","alt1","alt2","alt3","alt4"];
+
+    const container = document.getElementById("routesContainer");
+    container.innerHTML = "";
+
+    routes.forEach((route, index) => {
+
+        const div = document.createElement("div");
+        div.className = "route-card " + classes[index];
+
+        div.innerHTML =
+            (index === 0 ? "🚀 Best: " : "🛣 Option: ") + route;
+
+        div.onclick = () =>
+            window.open(`https://www.google.com/maps/dir/${source}/${destination}`, "_blank");
+
+        container.appendChild(div);
+    });
+
+    document.getElementById("temp").innerText = weather.temp + " °C";
+    document.getElementById("rain").innerText = weather.condition;
+
+    const safetyEl = document.getElementById("safety");
+    safetyEl.innerText = safety.text;
+    safetyEl.className = safety.class;
+
+    document.getElementById("decision").innerHTML =
+        `<h3>🤖 AI Decision</h3>
+         <p>Risk Score: ${data.decision.riskScore}</p>`;
+
+    document.getElementById("mapFrame").src =
+        `https://maps.google.com/maps?q=${source}+to+${destination}&output=embed`;
+
+    if (myChart) myChart.destroy();
+
+    myChart = new Chart(document.getElementById("chart"), {
+        type: "doughnut",
+        data: {
+            labels: ["Weather", "Conflicts", "Traffic"],
+            datasets: [{
+                data: [
+                    data.weather.risk === "HIGH" ? 3 : 1,
+                    data.conflicts?.risk === "HIGH" ? 5 : 1,
+                    data.traffic.risk === "HIGH" ? 2 : 1
+                ],
+                backgroundColor: ["#38bdf8", "#facc15", "#f87171"]
+            }]
+        }
+    });
+}
+</script>
+
+</body>
+</html>
